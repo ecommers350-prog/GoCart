@@ -4,8 +4,11 @@ import { format } from "date-fns"
 import toast from "react-hot-toast"
 import { DeleteIcon } from "lucide-react"
 import { couponDummyData } from "@/assets/assets"
+import axios from "axios"
 
 export default function AdminCoupons() {
+
+    
 
     const [coupons, setCoupons] = useState([])
 
@@ -20,12 +23,27 @@ export default function AdminCoupons() {
     })
 
     const fetchCoupons = async () => {
-        setCoupons(couponDummyData)
+        try {
+            const {data} = await axios.get('/api/admin/coupon', { withCredentials: true })
+            setCoupons(data.coupons)
+        } catch (error) {
+            toast.error(error.response?.data?.error || error.message )
+        }
     }
 
     const handleAddCoupon = async (e) => {
         e.preventDefault()
-        // Logic to add a coupon
+        try {
+
+            newCoupon.discount = Number(newCoupon.discount)
+            newCoupon.expiresAt = new Date(newCoupon.expiresAt)
+            
+            const {data} = await axios.post('/api/admin/coupon',{ coupon: newCoupon }, { withCredentials: true })
+            toast.success(data.message)
+            await fetchCoupons()
+        } catch (error) {
+            toast.error(error.response?.data?.error || error.message )
+        }
 
 
     }
@@ -35,7 +53,16 @@ export default function AdminCoupons() {
     }
 
     const deleteCoupon = async (code) => {
-        // Logic to delete a coupon
+        try {
+            const confirm = window.confirm("Are you sure you want to delete this coupon?")
+            if(!confirm) return;
+
+            const {data} = await axios.delete(`/api/admin/coupon?code=${code}`, { withCredentials: true })
+            toast.success(data.message)
+            await fetchCoupons()
+        } catch (error) {
+            toast.error(error.response?.data?.error || error.message )
+        }
 
 
     }

@@ -50,7 +50,7 @@ export const syncUserDeletion = inngest.createFunction(
 // Inngest function to delete coupons on expiry
 export const deleteCouponOnExpiry = inngest.createFunction(
     {id: 'delete-coupon-on-expiry'},
-    { schedule: 'app/coupon.expired' },
+    { event: 'app/coupon.expired' },
     async ({ event, step }) => {
         const {data} = event
         const expiryDate = new Date(data.expires_at)

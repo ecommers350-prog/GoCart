@@ -6,36 +6,40 @@ import { NextResponse } from "next/server";
 // toggle stock of a product
 export async function POST(request) {
     try {
-        const {userId} = getAuth();
+        const { userId } = getAuth(request); // pass request
         const { productId } = await request.json();
 
         if (!productId) {
-            return NextResponse.json({error: "missing details: productId"}, {status: 400})
+            return NextResponse.json({ error: "missing details: productId" }, { status: 400 });
         }
 
         const storeId = await authSeller(userId);
 
         if (!storeId) {
-            return NextResponse.json({error: "not authorized"}, { status: 401})
+            return NextResponse.json({ error: "not authorized" }, { status: 401 });
         }
 
-        // check if product exists
-        const product = await prisma.product.findMany({
-            where: {id: productId, storeId}
-        })
+        // Use findFirst instead of findMany
+        const product = await prisma.product.findFirst({
+            where: { id: productId, storeId },
+        });
 
         if (!product) {
-            return NextResponse.json({error: "no producy found"}, { status: 404})
+            return NextResponse.json({ error: "no product found" }, { status: 404 });
         }
 
-        await prisma.product.update({
-            where: {id: productId},
-            data: {inStock: !product.inStock}
-        })
+        // toggle inStock
+        const updatedProduct = await prisma.product.update({
+            where: { id: productId },
+            data: { inStock: !product.inStock },
+        });
 
-        return NextResponse.json({message: "Product stock updated successfully"})
+        return NextResponse.json({
+            message: "Product stock updated successfully",
+            product: updatedProduct,
+        });
     } catch (error) {
         console.error(error);
-        return NextResponse.json({error: error.code || error.message}, {status: 400}) 
+        return NextResponse.json({ error: error.code || error.message }, { status: 400 });
     }
 }

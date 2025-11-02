@@ -1,6 +1,4 @@
 import prisma from "@/lib/prisma";
-import { config } from "@/middleware";
-import { isPageStatic } from "next/dist/build/utils";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 

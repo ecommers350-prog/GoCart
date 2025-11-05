@@ -2,79 +2,92 @@ import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2022-11-15",
+});
 
 export async function POST(request) {
-    try {
-        const body = await request.text()
-        const sig = request.headers.get('stripe-signature')
+  const sig = request.headers.get("stripe-signature");
+  const body = await request.text();
 
-        const event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_SECRET_KEY)
+  let event;
 
-        const handlePaymentIntent = async (paymentIntentId, isPaid) => {
-            const session = await stripe.checkout.session.list({
-                payment_intent: paymentIntentId,
-            })
+  try {
+    event = stripe.webhooks.constructEvent(
+      body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error("Stripe signature verification failed:", err.message);
+    return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
+  }
 
-            const {orderIds, userId, appId} = session.data[0].metadata
-            
-                    if (appId !== 'GoCart') {
-                    return NextResponse.json({received: true, message: 'Invalid app id'})
-                }
+  const handlePayment = async (object, isPaid) => {
+    const { metadata } = object;
 
-                const orderIdsArray = orderIds.split(',')
-
-                if (isPaid) {
-                    // mark order as paid
-                    await Promise.all(orderIdsArray.map(async (orderId) => {
-                        await prisma.order.update({
-                            where: {id: orderId},
-                            data: {isPaid: true}
-                        }) 
-                    }))
-
-                    // delete cart from user
-                    await prisma.user.update({
-                        where: {id: userId},
-                        data: {cart: {}}
-                    })
-                }else{
-                        // delete order from db
-                        await Promise.all(orderIdsArray.map(async (orderId) => {
-                            await prisma.order.delete({
-                                where: {id: orderId}
-                            })
-                        }))
-                    }
-        }
-
-       
-
-        switch (event.type) {
-            case 'payment_intent.succeeded':{
-                await handlePaymentIntent(event.data.object.id, true);
-                break;
-            }
-
-            case 'payment_intent.failed':{
-                await handlePaymentIntent(event.data.object.id, false);
-                break;
-            }
-
-            default:
-                console.log('Unhandled event type:', event.type);
-                break;
-        }
-
-        return NextResponse.json({received: true})
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({error: 'Webhook error'}, {status: 500});
+    if (!metadata) {
+      console.warn("No metadata found in session/paymentIntent");
+      return;
     }
+
+    const { orderIds, userId, appId } = metadata;
+
+    if (appId !== "GoCart") return;
+
+    const orderIdsArray = orderIds.split(",");
+
+    if (isPaid) {
+      // Mark orders as paid
+      await Promise.all(
+        orderIdsArray.map((orderId) =>
+          prisma.order.update({
+            where: { id: orderId },
+            data: { isPaid: true },
+          })
+        )
+      );
+
+      // Clear user cart
+      await prisma.user.update({
+        where: { id: userId },
+        data: { cart: {} },
+      });
+    } else {
+      // Delete unpaid orders
+      await Promise.all(
+        orderIdsArray.map((orderId) =>
+          prisma.order.delete({
+            where: { id: orderId },
+          })
+        )
+      );
+    }
+  };
+
+  try {
+    switch (event.type) {
+      case "checkout.session.completed":
+        await handlePayment(event.data.object, true);
+        break;
+
+      case "payment_intent.payment_failed":
+        await handlePayment(event.data.object, false);
+        break;
+
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
+    }
+
+    return NextResponse.json({ received: true });
+  } catch (error) {
+    console.error("Error handling webhook:", error);
+    return NextResponse.json({ error: error.message || "Webhook error" }, { status: 500 });
+  }
 }
 
 export const config = {
-    api: {
-        bodyParser: false,
-    },
+  api: {
+    bodyParser: false,
+  },
 };

@@ -49,13 +49,33 @@ Then, run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+
+npm install
+
+npm install @clerk/nextjs
+
+npm i @prisma/client
+
+npx prisma generate
+
+npm install ws @prisma/adapter-neon @neondatabase/serverless
+
+npm install -D @types/ws
+
+npm install prisma@6 @prisma/client@6
+
+npx prisma generate
+
+npx prisma db push
+
+npm install inngest
+
+npm install axios
+
+npm install imagekit
+
+npm install stripe
+
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
